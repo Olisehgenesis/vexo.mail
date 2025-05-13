@@ -1,6 +1,5 @@
 // server/models/User.js
 const mongoose = require('mongoose');
-const crypto = require('crypto');
 
 const userSchema = new mongoose.Schema({
   walletAddress: {
@@ -14,13 +13,8 @@ const userSchema = new mongoose.Schema({
     required: true,
     unique: true,
   },
-  domainName: {
+  baseName: {
     type: String,
-    default: null,
-  },
-  domainType: {
-    type: String,
-    enum: ['ens', 'base', 'none', null],
     default: null,
   },
   publicKey: {

@@ -1,15 +1,16 @@
-// pages/index.js
+'use client';
 import React, { useEffect } from 'react';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import Head from 'next/head';
 import { useAccount } from 'wagmi';
-import { useAuth } from '../contexts/AuthContext';
-import LoginForm from '../components/auth/LoginForm';
+import { useAuth } from '@/context/AuthContext';
+import LoginForm from '@/components/auth/LoginForm';
 
 export default function Home() {
   const router = useRouter();
   const { isConnected } = useAccount();
   const { isLoggedIn, loading } = useAuth();
+  console.log("isLoggedIn", isLoggedIn);
 
   // Redirect if already logged in
   useEffect(() => {

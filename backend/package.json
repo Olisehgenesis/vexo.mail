@@ -18,7 +18,8 @@
     "mailgun-js": "^0.22.0",
     "mongodb": "^6.16.0",
     "mongoose": "^7.5.1",
-    "resend": "^4.5.1"
+    "resend": "^4.5.1",
+    "viem": "^2.29.2"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"

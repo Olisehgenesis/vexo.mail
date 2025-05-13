@@ -1,7 +1,8 @@
-import '@coinbase/onchainkit/styles.css';
+
 import type { Metadata } from 'next';
 import './globals.css';
 import { Providers } from './providers';
+import '@coinbase/onchainkit/styles.css';
 
 export const metadata: Metadata = {
   title: process.env.NEXT_PUBLIC_ONCHAINKIT_PROJECT_NAME,

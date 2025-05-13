@@ -3,6 +3,62 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { ethers } = require('ethers');
 const axios = require('axios');
+const { createPublicClient, http, keccak256, encodePacked, namehash } = require('viem');
+const { base, mainnet } = require('viem/chains');
+// Import the ABI with proper error handling
+let L2ResolverAbi;
+try {
+  L2ResolverAbi = require('./L2ResolverAbi');
+  // Make sure it's an array
+  if (!Array.isArray(L2ResolverAbi)) {
+    if (L2ResolverAbi.default && Array.isArray(L2ResolverAbi.default)) {
+      L2ResolverAbi = L2ResolverAbi.default;
+    } else {
+      console.error('Invalid ABI format, using fallback');
+      L2ResolverAbi = [
+        {
+          "inputs": [{"internalType": "bytes32", "name": "node", "type": "bytes32"}],
+          "name": "name",
+          "outputs": [{"internalType": "string", "name": "", "type": "string"}],
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "inputs": [
+            {"internalType": "bytes32", "name": "node", "type": "bytes32"},
+            {"internalType": "string", "name": "key", "type": "string"}
+          ],
+          "name": "text",
+          "outputs": [{"internalType": "string", "name": "", "type": "string"}],
+          "stateMutability": "view",
+          "type": "function"
+        }
+      ];
+    }
+  }
+} catch (error) {
+  console.error('Error loading ABI:', error);
+  // Fallback ABI with minimal required functions
+  L2ResolverAbi = [
+    {
+      "inputs": [{"internalType": "bytes32", "name": "node", "type": "bytes32"}],
+      "name": "name",
+      "outputs": [{"internalType": "string", "name": "", "type": "string"}],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {"internalType": "bytes32", "name": "node", "type": "bytes32"},
+        {"internalType": "string", "name": "key", "type": "string"}
+      ],
+      "name": "text",
+      "outputs": [{"internalType": "string", "name": "", "type": "string"}],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ];
+}
 
 // Verify a wallet signature
 const verifySignature = (address, message, signature) => {
@@ -81,39 +137,83 @@ const decryptData = (encryptedData, iv, authTag, key) => {
   }
 };
 
-// Check if an address has an ENS name
-const resolveEnsName = async (address) => {
-  try {
-    // Use Ethereum mainnet provider to resolve ENS
-    const provider = new ethers.providers.JsonRpcProvider(
-      process.env.ETH_RPC_URL || 'https://eth-mainnet.g.alchemy.com/v2/' + process.env.ALCHEMY_KEY
-    );
-    
-    const name = await provider.lookupAddress(address);
-    return name;
-  } catch (error) {
-    console.error('ENS resolution error:', error);
-    return null;
-  }
+// Format base names correctly
+const formatBaseName = (name) => {
+  if (!name) return '';
+  if (name.endsWith('.base.eth')) return name;
+  return `${name}.base.eth`;
 };
 
-// Check if an address has a Base name
+// Base resolver address
+const BASE_RESOLVER_ADDRESS = '0xC6d566A56A1aFf6508b41f6c90ff131615583BCD';
+
+// Create a Viem client for contract interactions
+const baseClient = createPublicClient({
+  chain: base,
+  transport: http('https://mainnet.base.org')
+});
+
+/**
+ * Convert an chainId to a coinType hex for reverse chain resolution
+ */
+const convertChainIdToCoinType = (chainId) => {
+  // L1 resolvers to addr
+  if (chainId === mainnet.id) {
+    return "addr";
+  }
+
+  const cointype = (0x80000000 | chainId) >>> 0;
+  return cointype.toString(16).toLocaleUpperCase();
+};
+
+/**
+ * Convert an address to a reverse node for ENS resolution
+ */
+const convertReverseNodeToBytes = (address, chainId) => {
+  const addressFormatted = address.toLowerCase();
+  const addressNode = keccak256(addressFormatted.substring(2));
+  const chainCoinType = convertChainIdToCoinType(chainId);
+  const baseReverseNode = namehash(`${chainCoinType.toLocaleUpperCase()}.reverse`);
+  const addressReverseNode = keccak256(
+    encodePacked(["bytes32", "bytes32"], [baseReverseNode, addressNode])
+  );
+  return addressReverseNode;
+};
+
+// Resolve a Base name for an address
 const resolveBaseName = async (address) => {
+  if (!address) return null;
+  
   try {
-    // Use Base API to check for names
-    // This is a placeholder - you would need to implement this based on Base's naming service
-    const response = await axios.get(
-      `https://api.base.org/v1/names?address=${address}`,
-      { headers: { 'x-api-key': process.env.BASE_API_KEY } }
-    );
+    console.log('Resolving Base name for address:', address);
+    const addressReverseNode = convertReverseNodeToBytes(address, base.id);
+    console.log('Reverse node:', addressReverseNode);
     
-    if (response.data && response.data.names && response.data.names.length > 0) {
-      return response.data.names[0];
+    // Debug check for ABI format
+    console.log('ABI type:', typeof L2ResolverAbi);
+    console.log('ABI is array:', Array.isArray(L2ResolverAbi));
+    if (Array.isArray(L2ResolverAbi)) {
+      console.log('ABI length:', L2ResolverAbi.length);
+      console.log('First ABI item:', JSON.stringify(L2ResolverAbi[0]));
+    }
+    
+    // Query the resolver contract
+    const name = await baseClient.readContract({
+      abi: L2ResolverAbi,
+      address: BASE_RESOLVER_ADDRESS,
+      functionName: 'name',
+      args: [addressReverseNode],
+    });
+    
+    console.log('Resolved name from contract:', name);
+    
+    if (name && name !== '') {
+      return name;
     }
     
     return null;
   } catch (error) {
-    console.error('Base name resolution error:', error);
+    console.error('Error resolving Base name:', error);
     return null;
   }
 };
@@ -125,6 +225,8 @@ module.exports = {
   generateNonce,
   encryptData,
   decryptData,
-  resolveEnsName,
-  resolveBaseName
+  resolveBaseName,
+  convertReverseNodeToBytes,
+  formatBaseName,
+  convertChainIdToCoinType
 };

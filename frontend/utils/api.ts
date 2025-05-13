@@ -25,25 +25,37 @@ api.interceptors.request.use(
 // Authentication API
 export const authAPI = {
   // Get nonce for wallet signature
-  getNonce: async (address) => {
+  getNonce: async (address: string) => {
     const response = await api.get(`/auth/nonce?address=${address}`);
+    console.log("getNonce", response.data);
     return response.data;
   },
   
-  // Verify wallet signature
-  verifySignature: async (address, signature, nonce, publicKey) => {
-    const response = await api.post('/auth/verify', {
-      address,
-      signature,
-      nonce,
-      publicKey,
-    });
+  // utils/api.js (update the verifySignature method)
+verifySignature: async (address, signature, nonce, publicKey, baseName = null, emailAddress = null) => {
+  const response = await api.post('/auth/verify', {
+    address,
+    signature,
+    nonce,
+    publicKey,
+    baseName,
+    emailAddress
+  });
+  return response.data;
+},
+
+  //check basename 
+  checkBasename: async (address: string) => {
+    const response = await api.get(`/auth/basename?address=${address}`);
+    console.log("checkBasename", response.data);
     return response.data;
   },
   
   // Check domain name for wallet
-  checkDomain: async (address) => {
+  checkDomain: async (address: string) => {
+    console.log("checkDomain", address);
     const response = await api.get(`/auth/domain?address=${address}`);
+    console.log("checkDomain", response.data);
     return response.data;
   },
   

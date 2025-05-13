@@ -6,7 +6,6 @@ const {
   generateToken, 
   generateNonce,
   encryptData,
-  resolveEnsName,
   resolveBaseName
 } = require('../utils/auth');
 const crypto = require('crypto');
@@ -42,6 +41,7 @@ exports.getNonce = async (req, res) => {
 };
 
 // Verify a wallet signature and authenticate user
+// Verify a wallet signature and authenticate user
 exports.verifySignature = async (req, res) => {
   try {
     const { address, signature, nonce, publicKey } = req.body;
@@ -68,38 +68,23 @@ exports.verifySignature = async (req, res) => {
       return res.status(401).json({ error: 'Invalid signature' });
     }
     
+    // Get Base name for this address
+    let baseName = await resolveBaseName(address);
+    
     // Check if user exists
     let user = await User.findOne({ walletAddress: address.toLowerCase() });
     
     // If user doesn't exist, create a new user
     if (!user) {
-      // Check for ENS or Base name
-      let domainName = null;
-      let domainType = 'none';
-      
-      const ensName = await resolveEnsName(address);
-      if (ensName) {
-        domainName = ensName;
-        domainType = 'ens';
-      } else {
-        const baseName = await resolveBaseName(address);
-        if (baseName) {
-          domainName = baseName;
-          domainType = 'base';
-        }
-      }
-      
-      // Generate email address
-      const emailAddress = domainName
-        ? `${domainName}@vexo.social`
+      // Create email address based on Base name or wallet address
+      const emailAddress = baseName
+        ? `${baseName}@vexo.social`
         : `${address.slice(0, 8).toLowerCase()}@vexo.social`;
       
       // Generate a data encryption key
       const dataKey = crypto.randomBytes(32).toString('hex');
       
-      // Encrypt the data key with the user's public key (placeholder)
-      // In a real implementation, you'd encrypt this with the user's public key
-      // For now, we'll encrypt it with a derivation of the nonce for demo purposes
+      // Encrypt the data key (in a real implementation, you'd encrypt with public key)
       const encryptionKey = crypto.createHash('sha256').update(nonce).digest('hex');
       const { encryptedData, iv, authTag } = encryptData(dataKey, encryptionKey);
       
@@ -107,8 +92,7 @@ exports.verifySignature = async (req, res) => {
       user = await User.create({
         walletAddress: address.toLowerCase(),
         emailAddress,
-        domainName,
-        domainType,
+        baseName,
         publicKey,
         encryptedDataKey: encryptedData,
         dataKeyIv: iv,
@@ -122,9 +106,15 @@ exports.verifySignature = async (req, res) => {
         }]
       });
     } else {
-      // Update last login
+      // Update Base name and email address if changed
+      if (baseName && baseName !== user.baseName) {
+        user.baseName = baseName;
+        user.emailAddress = `${baseName}@vexo.social`;
+      }
+      
+      // Update last login and public key
       user.lastLogin = new Date();
-      user.publicKey = publicKey; // Update public key
+      user.publicKey = publicKey;
       await user.save();
     }
     
@@ -141,7 +131,7 @@ exports.verifySignature = async (req, res) => {
         id: user._id,
         walletAddress: user.walletAddress,
         emailAddress: user.emailAddress,
-        domainName: user.domainName,
+        baseName: user.baseName,
       }
     });
   } catch (error) {
@@ -213,5 +203,27 @@ exports.getMe = async (req, res) => {
   } catch (error) {
     console.error('Get user error:', error);
     res.status(500).json({ error: 'Failed to get user information' });
+  }
+};
+
+// server/controllers/authController.js (add this method)
+exports.getBaseName = async (req, res) => {
+  try {
+    const { address } = req.query;
+    
+    if (!address) {
+      return res.status(400).json({ error: 'Wallet address is required' });
+    }
+    
+    // Use the Base name resolution function from auth.js
+    const baseName = await resolveBaseName(address);
+    
+    res.status(200).json({
+      baseName,
+      emailAddress: baseName ? `${baseName}@vexo.social` : `${address.slice(0, 8).toLowerCase()}@vexo.social`
+    });
+  } catch (error) {
+    console.error('Base name resolution error:', error);
+    res.status(500).json({ error: 'Failed to resolve Base name' });
   }
 };

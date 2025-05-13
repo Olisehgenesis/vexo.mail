@@ -6,6 +6,8 @@ const { protect } = require('../middleware/authMiddleware');
 
 // Public routes
 router.get('/nonce', authController.getNonce);
+// server/routes/auth.js (add this route)
+router.get('/basename', authController.getBaseName);
 router.post('/verify', authController.verifySignature);
 router.get('/domain', authController.checkDomain);
 
