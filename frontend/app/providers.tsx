@@ -3,6 +3,8 @@
 import { base } from 'wagmi/chains';
 import { OnchainKitProvider } from '@coinbase/onchainkit';
 import type { ReactNode } from 'react';
+import { AuthProvider } from '@/context/AuthContext';
+import { EmailProvider } from '@/context/EmailContext';
 
 export function Providers(props: { children: ReactNode }) {
   return (
@@ -14,7 +16,11 @@ export function Providers(props: { children: ReactNode }) {
         }
       }}
     >
+      <AuthProvider>
+        <EmailProvider>
       {props.children}
+      </EmailProvider>
+      </AuthProvider>
     </OnchainKitProvider>
   );
 }

@@ -6,11 +6,11 @@ import {
   ArrowLeftIcon, 
   TrashIcon, 
   ArchiveBoxIcon,
-  ReplyIcon
+  ArrowPathIcon
 } from '@heroicons/react/24/outline';
-import { useEmails } from '../../contexts/EmailContext';
+import { useEmails } from '@/context/EmailContext';
 
-const EmailView = ({ emailId }) => {
+const EmailView = ({ emailId }: { emailId: string }) => {
   const router = useRouter();
   const { currentEmail, loading, error, deleteEmail, moveToFolder } = useEmails();
 

@@ -1,59 +1,68 @@
-// components/email/EmailList.js
+// components/email/EmailList.tsx
 import React from 'react';
-import { useRouter } from 'next/router';
-import { useEmails } from '../../contexts/EmailContext';
-import EmailItem from './EmailItem';
+import { useEmails } from '@/context/EmailContext';
 
 const EmailList = () => {
-  const router = useRouter();
-  const { emails, loading, error, currentFolder, markAsRead } = useEmails();
-
-  const handleEmailClick = (emailId) => {
-    // Mark as read and navigate to email view
-    markAsRead(emailId);
-    router.push(`/email/${emailId}`);
-  };
-
-  const handleStarClick = (emailId) => {
-    // Toggle star status
-    // This would require a new API endpoint and context method
-    console.log('Toggle star for', emailId);
-  };
+  const { emails, loading, error } = useEmails();
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+      <div className="py-10 text-center">
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500 mb-2"></div>
+        <p className="text-gray-500">Loading emails...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-red-500">{error}</div>
+      <div className="py-10 text-center">
+        <p className="text-red-500">Error loading emails: {error}</p>
+        <button 
+          className="mt-2 px-4 py-2 bg-primary-500 text-white rounded-md hover:bg-primary-600"
+          onClick={() => window.location.reload()}
+        >
+          Retry
+        </button>
       </div>
     );
   }
 
-  if (emails.length === 0) {
+  if (!emails || emails.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-64">
-        <div className="text-gray-500 text-lg">No emails in {currentFolder}</div>
+      <div className="py-10 text-center">
+        <p className="text-gray-500">No emails in this folder</p>
       </div>
     );
   }
 
   return (
-    <div className="divide-y divide-gray-200">
-      {emails.map((email) => (
-        <EmailItem
-          key={email.id}
-          email={email}
-          onClick={handleEmailClick}
-          onStar={handleStarClick}
-        />
-      ))}
+    <div className="bg-white shadow overflow-hidden sm:rounded-md">
+      <ul className="divide-y divide-gray-200">
+        {emails.map((email) => (
+          <li key={email.id} className="px-4 py-4 sm:px-6 hover:bg-gray-50 cursor-pointer">
+            <div className="flex items-center justify-between">
+              <div className="truncate">
+                <div className="flex items-center">
+                  <p className={`text-sm font-medium ${email.isRead ? 'text-gray-500' : 'text-gray-900'}`}>
+                    {email.fromName || email.from}
+                  </p>
+                </div>
+                <div className="mt-1">
+                  <p className={`text-sm ${email.isRead ? 'text-gray-400' : 'text-gray-700'}`}>
+                    {email.subject}
+                  </p>
+                </div>
+              </div>
+              <div className="ml-2">
+                <p className="text-xs text-gray-500">
+                  {new Date(email.createdAt).toLocaleDateString()}
+                </p>
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 };

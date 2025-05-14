@@ -1,7 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/router';
-import { useAuth } from '../../contexts/AuthContext';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
 import {
   InboxIcon,
   PaperAirplaneIcon,
@@ -25,14 +25,15 @@ const Navigation = () => {
   const { user, logout } = useAuth();
   
   // Get current folder from URL
-  const currentFolder = router.query.folder || 'inbox';
+  const searchParams = new URLSearchParams(window.location.search);
+  const currentFolder = searchParams.get('folder') || 'inbox';
   
   // Determine if a nav item is active
-  const isActive = (href) => {
-    if (href === '/dashboard' && router.pathname === '/dashboard' && !router.query.folder) {
+  const isActive = (href: string) => {
+    if (href === '/dashboard' && window.location.pathname === '/dashboard' && !searchParams.get('folder')) {
       return true;
     }
-    return router.asPath === href;
+    return href === window.location.pathname + window.location.search;
   };
 
   return (

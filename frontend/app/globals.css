@@ -2,3 +2,65 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Add this to your global.css or tailwind.css file */
+
+@keyframes float1 {
+    0%, 100% {
+      transform: translateY(0) translateX(0);
+    }
+    50% {
+      transform: translateY(-20px) translateX(10px);
+    }
+  }
+  
+  @keyframes float2 {
+    0%, 100% {
+      transform: translateY(0) translateX(0);
+    }
+    50% {
+      transform: translateY(20px) translateX(-15px);
+    }
+  }
+  
+  @keyframes float3 {
+    0%, 100% {
+      transform: translateY(0) translateX(0) scale(1);
+    }
+    50% {
+      transform: translateY(-15px) translateX(5px) scale(1.05);
+    }
+  }
+  
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 0.5;
+    }
+    50% {
+      opacity: 0.8;
+    }
+  }
+  
+  .animate-float1 {
+    animation: float1 10s ease-in-out infinite;
+  }
+  
+  .animate-float2 {
+    animation: float2 15s ease-in-out infinite;
+  }
+  
+  .animate-float3 {
+    animation: float3 12s ease-in-out infinite;
+  }
+  
+  .animate-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  
+  /* Grid pattern background */
+  .bg-grid-pattern {
+    background-image: 
+      linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }

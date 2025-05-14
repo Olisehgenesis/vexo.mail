@@ -2,19 +2,20 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const jwt = require('jsonwebtoken');
+const connectDB = require('./db/db'); // New db connection module
 const authRoutes = require('./routes/auth');
 const emailService = require('./services/emailService');
+const mongoose = require('mongoose');
+const emailRoutes = require('./routes/email');
+
+
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Load environment variables
-const MONGODB_URI = process.env.MONGODB_URI ;
 const JWT_SECRET = process.env.JWT_SECRET;
-// Replace with:
-const MAILGUN_API_KEY = process.env.MAILGUN_API_KEY;
-const MAILGUN_DOMAIN = process.env.MAILGUN_DOMAIN || 'vexo.social';
 
 
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS 
@@ -27,18 +28,14 @@ if (!JWT_SECRET) {
   process.exit(1);
 }
 
-// And update the API key check:
-if (!MAILGUN_API_KEY) {
-    console.error('MAILGUN_API_KEY environment variable is required');
-    process.exit(1);
-  }
+
 // Middleware
 app.use(cors({
   origin: function(origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
-    if (ALLOWED_ORIGINS.indexOf(origin) === -1) {
+    if (ALLOWED_ORIGINS.indexOf(origin) === -1 && ALLOWED_ORIGINS.indexOf('*') === -1) {
       const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
       return callback(new Error(msg), false);
     }
@@ -50,26 +47,28 @@ app.use(cors({
 
 app.use(express.json());
 
-// Create a MongoClient with a MongoClientOptions object to set the Stable API version
-const client = new MongoClient(MONGODB_URI, {
-  serverApi: {
-    version: ServerApiVersion.v1,
-    strict: true,
-    deprecationErrors: true,
-  }
+// Then add this line where you set up the routes (after the app.use('/api/auth', authRoutes); line)
+app.use('/api/emails', emailRoutes);
+
+
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error('Global error handler:', err);
+  res.status(500).json({ 
+    error: 'Server error', 
+    details: process.env.NODE_ENV === 'development' ? err.message : undefined 
+  });
 });
 
 // Connect to MongoDB and start server
 async function startServer() {
   try {
-    // Connect to MongoDB
-    await client.connect();
-    // Confirm connection with a ping
-    await client.db("admin").command({ ping: 1 });
-    console.log("Connected to MongoDB Atlas successfully!");
+    // Connect to MongoDB using the new module
+    const isConnected = await connectDB(app); // Pass app here
     
-    // Store db connection for use in routes
-    app.locals.db = client.db('vexo');
+    if (!isConnected) {
+      console.warn('Starting server with fallback mechanisms due to MongoDB connection issues');
+    }
     
     // Routes
     app.use('/api/auth', authRoutes);
@@ -86,48 +85,55 @@ async function startServer() {
       }
     });
     
-    // Health check
+    // Health check with DB status
     app.get('/health', (req, res) => {
-      res.status(200).json({ status: 'ok' });
+      const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
+      res.status(200).json({ 
+        status: 'ok', 
+        db: dbStatus,
+        environment: process.env.NODE_ENV || 'development',
+        serverTime: new Date().toISOString()
+      });
     });
     
-    // Initialize Mailgun domain (only needed once)
-if (process.env.VERIFY_MAILGUN_DOMAIN === 'true') {
-    emailService.verifyMailgunDomain(MAILGUN_DOMAIN)
-      .then(success => {
-        if (success) {
-          console.log('Mailgun domain verification initiated');
-        } else {
-          console.error('Mailgun domain verification failed');
-        }
-      })
-      .catch(err => console.error('Mailgun domain verification error:', err));
-  }
+    // Add test route for development
+    if (process.env.NODE_ENV !== 'production') {
+      setupDevRoutes(app);
+    }
+    
+    
+    // Handle 404 errors
+    app.use((req, res) => {
+      res.status(404).json({ error: 'Endpoint not found' });
+    });
     
     // Start server
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
+      
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`
+          Server URLs:
+          - API: http://localhost:${PORT}/api
+          - Health: http://localhost:${PORT}/health
+          - Test token (dev): http://localhost:${PORT}/api/auth/test-token
+        `);
+      }
     });
     
   } catch (error) {
-    console.error('Failed to connect to MongoDB:', error);
+    console.error('Failed to start server:', error);
     process.exit(1);
   }
 }
 
-// Handle graceful shutdown
-process.on('SIGINT', async () => {
-  console.log('Closing MongoDB connection');
-  await client.close();
-  process.exit(0);
-});// Add at the top with other requires
-const jwt = require('jsonwebtoken');
-
-// Add these routes before the server start
-// WARNING: These routes are for testing/development only!
-if (process.env.NODE_ENV !== 'production') {
+// Dev routes for testing - only in development
+function setupDevRoutes(app) {
+  const mongoose = require('mongoose');
+  const User = require('./models/User');
+  
   // Generate a test token (FOR DEVELOPMENT ONLY)
-  app.post('/api/auth/test-token', (req, res) => {
+  app.post('/api/auth/test-token', async (req, res) => {
     try {
       const { walletAddress } = req.body;
       
@@ -135,85 +141,95 @@ if (process.env.NODE_ENV !== 'production') {
         return res.status(400).json({ error: 'Wallet address is required' });
       }
       
-      // Create a test user if one doesn't exist
-      const db = req.app.locals.db;
-      db.collection('users').findOne({ walletAddress: walletAddress.toLowerCase() })
-        .then(async (user) => {
-          let userId;
+      let userId;
+      
+      try {
+        // Try to find or create a user
+        let user = await User.findOne({ walletAddress: walletAddress.toLowerCase() });
+        
+        if (!user) {
+          // Create a test user
+          user = new User({
+            walletAddress: walletAddress.toLowerCase(),
+            emailAddress: `${walletAddress.slice(0, 8).toLowerCase()}@vexo.social`,
+            baseName: null,
+            publicKey: 'test-public-key',
+            encryptedDataKey: 'test-encrypted-key',
+            dataKeyIv: 'test-iv',
+            dataKeyAuthTag: 'test-auth-tag',
+            createdAt: new Date(),
+            lastLogin: new Date()
+          });
           
-          if (!user) {
-            // Create a test user
-            const result = await db.collection('users').insertOne({
-              walletAddress: walletAddress.toLowerCase(),
-              emailAddress: 'test@vexo.social',
-              domainName: null,
-              domainType: 'none',
-              publicKey: 'test-public-key',
-              encryptedDataKey: 'test-encrypted-key',
-              dataKeyIv: 'test-iv',
-              dataKeyAuthTag: 'test-auth-tag',
-              createdAt: new Date(),
-              lastLogin: new Date()
-            });
-            userId = result.insertedId;
-          } else {
-            userId = user._id;
-          }
-          
-          // Generate JWT token
-          const token = jwt.sign(
-            { 
-              userId, 
-              walletAddress: walletAddress.toLowerCase() 
-            },
-            process.env.JWT_SECRET,
-            { expiresIn: '1h' }
-          );
-          
-          res.status(200).json({ token });
-        })
-        .catch(err => {
-          console.error('Test token error:', err);
-          res.status(500).json({ error: 'Failed to generate test token' });
-        });
+          await user.save();
+        }
+        
+        userId = user._id;
+      } catch (dbError) {
+        console.error('Database error in test-token:', dbError);
+        // Use the wallet address as a fallback ID if DB fails
+        userId = walletAddress.toLowerCase();
+      }
+      
+      // Generate JWT token
+      const token = jwt.sign(
+        { 
+          userId, 
+          walletAddress: walletAddress.toLowerCase() 
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: '24h' } // Longer expiry for testing
+      );
+      
+      res.status(200).json({ 
+        token,
+        message: 'Test token generated - valid for 24 hours',
+        userId
+      });
     } catch (error) {
       console.error('Test token error:', error);
       res.status(500).json({ error: 'Failed to generate test token' });
     }
   });
+  
+  // Add API documentation route
+  app.get('/api/docs', (req, res) => {
+    res.json({
+      api: 'Vexo.social API',
+      version: '1.0.0',
+      endpoints: {
+        auth: {
+          '/api/auth/nonce': 'GET - Generate a nonce for wallet signature',
+          '/api/auth/verify': 'POST - Verify signature and authenticate',
+          '/api/auth/me': 'GET - Get current user info',
+          '/api/auth/basename': 'GET - Resolve Base name for wallet address',
+          '/api/auth/domain': 'GET - Check domain name for wallet address',
+          '/api/auth/test-token': 'POST - Generate test token (dev only)'
+        },
+        email: {
+          '/api/email/send': 'POST - Send an email',
+          '/api/email/incoming': 'POST - Webhook for incoming emails'
+        },
+        system: {
+          '/health': 'GET - System health check'
+        }
+      }
+    });
+  });
 }
 
-// Add email sending endpoint
-app.post('/api/email/send', async (req, res) => {
-  try {
-    // Check if user is authenticated
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-    
-    const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
-    if (!decoded || !decoded.userId) {
-      return res.status(401).json({ error: 'Invalid token' });
-    }
-    
-    // Validate email data
-    const { to, subject, text, html } = req.body;
-    
-    if (!to || !subject || (!text && !html)) {
-      return res.status(400).json({ error: 'To, subject, and text/html are required' });
-    }
-    
-    // Send email
-    const result = await emailService.sendEmail(decoded.userId, { to, subject, text, html });
-    
-    res.status(200).json({ success: true, messageId: result.messageId });
-  } catch (error) {
-    console.error('Email sending error:', error);
-    res.status(500).json({ error: 'Failed to send email: ' + error.message });
+// Handle graceful shutdown
+process.on('SIGINT', async () => {
+  console.log('Shutting down server...');
+  
+  // Close any other connections or resources
+  if (mongoose.connection.readyState === 1) {
+    console.log('Closing MongoDB connection');
+    await mongoose.connection.close();
   }
+  
+  console.log('Shutdown complete');
+  process.exit(0);
 });
 
 // Start the server
