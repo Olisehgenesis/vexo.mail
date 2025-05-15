@@ -41,6 +41,9 @@ importers:
       mongoose:
         specifier: ^7.8.7
         version: 7.8.7
+      pinata:
+        specifier: ^2.3.0
+        version: 2.3.0
       resend:
         specifier: ^4.5.1
         version: 4.5.1(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
@@ -777,6 +780,10 @@ packages:
   picomatch@2.3.1:
     resolution: {integrity: sha512-JU3teHTNjmE2VCGFzuY8EXzCDVwEqB2a8fsIvwaStHhAWJEeVd1o1QD80CU6+ZdEXXSLbSsuLwJjkCBWqRQUVA==}
     engines: {node: '>=8.6'}
+
+  pinata@2.3.0:
+    resolution: {integrity: sha512-WMS5Y5UsocoplZiMdpHP3WQ97BzM3GtM2BKr4kLYJz0ug/5sAZkLxDOoC9SSGpiGjacUwA0BU43nquIJ70YwZw==}
+    engines: {node: '>=20'}
 
   prelude-ls@1.1.2:
     resolution: {integrity: sha512-ESF23V4SKG6lVSGZgYNpbsiaAkdab6ZgOxe52p7+Kid3W3u3bxR4Vfd/o21dmN7jSt0IwgZ4v5MUd26FEtXE9w==}
@@ -1839,6 +1846,8 @@ snapshots:
   peberminta@0.9.0: {}
 
   picomatch@2.3.1: {}
+
+  pinata@2.3.0: {}
 
   prelude-ls@1.1.2: {}
 

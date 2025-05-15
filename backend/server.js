@@ -8,11 +8,13 @@ const authRoutes = require('./routes/auth');
 const emailService = require('./services/emailService');
 const mongoose = require('mongoose');
 const emailRoutes = require('./routes/email');
+const emailIpfsRoutes = require('./routes/emailIpfsRoutes');
+
 
 
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5067;
 
 // Load environment variables
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -49,6 +51,7 @@ app.use(express.json());
 
 // Then add this line where you set up the routes (after the app.use('/api/auth', authRoutes); line)
 app.use('/api/emails', emailRoutes);
+app.use('/api/emails-ipfs', emailIpfsRoutes);
 
 
 // Global error handler
