@@ -180,260 +180,182 @@ const LoginForm = () => {
       checkIdentity(address);
     }
   };
-  
-  // Try direct dashboard access (debug mode)
-  const tryDirectDashboard = () => {
-    if (process.env.NODE_ENV === 'development') {
-      // In development, we'll try to go to dashboard without auth
-      window.location.href = '/dashboard';
-    }
-  };
 
   return (
-    <div className="w-full max-w-md mx-auto">
-      {/* Logo & Header */}
-      <div className="text-center mb-8">
-        <div className="inline-flex items-center justify-center w-16 h-16 bg-white rounded-full shadow-lg mb-4">
-          <span className="text-3xl font-bold text-blue-600">V</span>
+    <div className="p-8">
+      {/* Step 1: Connect Wallet */}
+      {step === 1 && (
+        <div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Sign in</h2>
+          <p className="text-sm text-gray-600 mb-6">Connect your wallet to continue</p>
+          
+          {!isConnected ? (
+            <Wallet onConnect={handleConnect}>
+              <ConnectWallet 
+                buttonClassName="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-300 ease-in-out"
+              />
+            </Wallet>
+          ) : (
+            <div className="flex items-center justify-center py-3 px-4 text-sm text-gray-700 mb-4">
+              <div className="mr-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              </div>
+              Wallet connected
+            </div>
+          )}
+          
+          {loadingBaseName && (
+            <div className="mt-4 flex items-center justify-center">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+              <p className="ml-2 text-sm text-gray-600">Checking identity...</p>
+            </div>
+          )}
+          
+          {error && (
+            <div className="mt-4 p-3 bg-red-50 rounded-md">
+              <p className="text-xs text-red-600">{error}</p>
+            </div>
+          )}
         </div>
-        <h1 className="text-2xl font-bold text-gray-900">vexo.social</h1>
-        <p className="text-sm text-gray-600 mt-1">Web3 Email System</p>
-      </div>
+      )}
       
-      {/* Main Card */}
-      <div className="bg-white rounded-xl shadow-xl overflow-hidden">
-        {/* Step 1: Connect Wallet */}
-        {step === 1 && (
-          <div className="p-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Sign in</h2>
-            <p className="text-sm text-gray-600 mb-6">Connect your wallet to continue</p>
-            
-            {!isConnected ? (
-              <Wallet onConnect={handleConnect}>
-                <ConnectWallet 
-                  buttonClassName="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-300 ease-in-out"
-                />
-              </Wallet>
-            ) : (
-              <div className="flex items-center justify-center py-3 px-4 border border-gray-300 rounded-lg text-sm text-gray-700 mb-4">
-                <div className="mr-2">
-                  <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                </div>
-                Wallet connected
+      {/* Step 2: Identity Found */}
+      {step === 2 && (
+        <div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">
+            {baseName ? 'Identity found' : 'No identity found'}
+          </h2>
+          <p className="text-sm text-gray-600 mb-6">
+            {baseName 
+              ? 'We found an existing identity for your wallet' 
+              : 'No existing identity was found for this wallet'}
+          </p>
+          
+          <div className="bg-gray-50 p-4 rounded-md mb-6">
+            <div className="flex items-start mb-2">
+              <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 mr-3">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
+                  <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
+                </svg>
               </div>
-            )}
-            
-            {loadingBaseName && (
-              <div className="mt-4 flex items-center justify-center">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
-                <p className="ml-2 text-sm text-gray-600">Checking identity...</p>
+              <div>
+                <p className="text-sm font-medium text-gray-900">Email</p>
+                <p className="text-sm text-gray-700">{emailAddress}</p>
               </div>
-            )}
+            </div>
             
-            {error && (
-              <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
-                <p className="text-xs text-red-600">{error}</p>
-              </div>
-            )}
-          </div>
-        )}
-        
-        {/* Step 2: Identity Found */}
-        {step === 2 && (
-          <div className="p-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">
-              {baseName ? 'Identity found' : 'No identity found'}
-            </h2>
-            <p className="text-sm text-gray-600 mb-6">
-              {baseName 
-                ? 'We found an existing identity for your wallet' 
-                : 'No existing identity was found for this wallet'}
-            </p>
-            
-            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-6">
-              <div className="flex items-start mb-2">
-                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 mr-3">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
-                    <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
+            {baseName && (
+              <div className="flex items-start">
+                <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 mr-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
                   </svg>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-900">Email</p>
-                  <p className="text-sm text-gray-700">{emailAddress}</p>
+                  <p className="text-sm font-medium text-gray-900">Base Name</p>
+                  <p className="text-sm text-gray-700">{baseName}</p>
                 </div>
-              </div>
-              
-              {baseName && (
-                <div className="flex items-start">
-                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 mr-3">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Base Name</p>
-                    <p className="text-sm text-gray-700">{baseName}</p>
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            <div className="flex flex-col space-y-3">
-              <button
-                onClick={proceedToSignature}
-                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-300 ease-in-out"
-              >
-                {baseName 
-                  ? 'Sign in with this identity' 
-                  : 'Sign in without identity'}
-              </button>
-              
-              <div className="flex space-x-3">
-                <button
-                  onClick={handleBack}
-                  className="flex-1 py-2 px-4 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200"
-                >
-                  Back
-                </button>
-                
-                <button
-                  onClick={handleDisconnect}
-                  className="flex-1 py-2 px-4 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200"
-                >
-                  Disconnect
-                </button>
-              </div>
-              
-              <button
-                onClick={handleRefresh}
-                className="text-xs text-blue-600 hover:text-blue-800 underline transition-colors duration-200"
-              >
-                Refresh identity check
-              </button>
-              
-              {process.env.NODE_ENV === 'development' && (
-                <button
-                  onClick={tryDirectDashboard}
-                  className="text-xs text-gray-400 hover:text-gray-600 underline transition-colors duration-200 mt-4"
-                >
-                  [Dev] Go to dashboard directly
-                </button>
-              )}
-            </div>
-            
-            {error && (
-              <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
-                <p className="text-xs text-red-600">{error}</p>
               </div>
             )}
           </div>
-        )}
-        
-        {/* Step 3: Sign Message */}
-        {step === 3 && nonce && (
-          <div className="p-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Sign to authenticate</h2>
-            <p className="text-sm text-gray-600 mb-6">
-              Sign this message with your wallet to access your email
-            </p>
+          
+          <div className="flex flex-col space-y-3">
+            <button
+              onClick={proceedToSignature}
+              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-300 ease-in-out"
+            >
+              {baseName 
+                ? 'Sign in with this identity' 
+                : 'Sign in without identity'}
+            </button>
             
-            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-6">
-              <p className="text-sm font-medium text-gray-900 mb-2">Message to sign:</p>
-              <pre className="text-xs bg-gray-100 p-3 rounded overflow-auto whitespace-pre-wrap">
-                {`Sign this message to access your vexo.social email account.\n\nNonce: ${nonce}`}
-              </pre>
-            </div>
-            
-            <div className="flex flex-col space-y-4">
-              {isAuthenticating ? (
-                <div className="flex items-center justify-center py-3">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500 mr-3"></div>
-                  <p className="text-sm text-blue-600">Authenticating...</p>
-                </div>
-              ) : (
-                <Signature
-                  message={`Sign this message to access your vexo.social email account.\n\nNonce: ${nonce}`}
-                  onSuccess={handleSignatureSuccess}
-                  onError={handleSignatureError}
-                  label="Sign to authenticate"
-                  className="w-full"
-                />
-              )}
-              
+            <div className="flex space-x-3">
               <button
                 onClick={handleBack}
-                disabled={isAuthenticating}
-                className="py-2 px-4 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 disabled:opacity-50"
+                className="flex-1 py-2 px-4 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none transition-all duration-200"
               >
                 Back
               </button>
+              
+              <button
+                onClick={handleDisconnect}
+                className="flex-1 py-2 px-4 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none transition-all duration-200"
+              >
+                Disconnect
+              </button>
             </div>
             
-            {error && (
-              <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
-                <p className="text-xs text-red-600">{error}</p>
-                
-                {process.env.NODE_ENV === 'development' && (
-                  <button
-                    onClick={tryDirectDashboard}
-                    className="text-xs text-gray-600 hover:underline mt-2"
-                  >
-                    [Dev] Skip authentication
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-      
-      {/* Footer */}
-      <div className="mt-8 text-center">
-        <p className="text-xs text-gray-500">
-          vexo.social © 2023 - Own your email with crypto wallet authentication
-        </p>
-      </div>
-      
-      {/* Debug Information (Dev only) */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="mt-4 p-4 bg-gray-100 rounded-md text-xs">
-          <h4 className="font-medium mb-2">Debug Info:</h4>
-          <pre className="overflow-auto text-xs">
-            {JSON.stringify({
-              step,
-              address,
-              isConnected,
-              baseName,
-              emailAddress,
-              nonce: nonce ? `${nonce.substring(0, 10)}...` : null,
-              checkedAddressesCount: checkedAddresses.size,
-              isAuthenticating
-            }, null, 2)}
-          </pre>
-          <div className="flex space-x-2 mt-2">
-            <button 
-              onClick={() => console.log('Full state:', {
-                address,
-                isConnected,
-                baseName,
-                emailAddress,
-                nonce,
-                error
-              })}
-              className="text-xs bg-gray-200 px-2 py-1 rounded"
-            >
-              Log State
-            </button>
-            <button 
+            <button
               onClick={handleRefresh}
-              className="text-xs bg-gray-200 px-2 py-1 rounded"
+              className="text-xs text-blue-600 hover:text-blue-800 underline transition-colors duration-200"
             >
-              Refresh
+              Refresh identity check
             </button>
           </div>
+          
+          {error && (
+            <div className="mt-4 p-3 bg-red-50 rounded-md">
+              <p className="text-xs text-red-600">{error}</p>
+            </div>
+          )}
         </div>
       )}
+      
+      {/* Step 3: Sign Message */}
+      {step === 3 && nonce && (
+        <div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Sign to authenticate</h2>
+          <p className="text-sm text-gray-600 mb-6">
+            Sign this message with your wallet to access your email
+          </p>
+          
+          <div className="bg-gray-50 p-4 rounded-md mb-6">
+            <p className="text-sm font-medium text-gray-900 mb-2">Message to sign:</p>
+            <pre className="text-xs bg-gray-100 p-3 rounded overflow-auto whitespace-pre-wrap">
+              {`Sign this message to access your vexo.social email account.\n\nNonce: ${nonce}`}
+            </pre>
+          </div>
+          
+          <div className="flex flex-col space-y-4">
+            {isAuthenticating ? (
+              <div className="flex items-center justify-center py-3">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500 mr-3"></div>
+                <p className="text-sm text-blue-600">Authenticating...</p>
+              </div>
+            ) : (
+              <Signature
+                message={`Sign this message to access your vexo.social email account.\n\nNonce: ${nonce}`}
+                onSuccess={handleSignatureSuccess}
+                onError={handleSignatureError}
+                label="Sign to authenticate"
+                className="w-full"
+              />
+            )}
+            
+            <button
+              onClick={handleBack}
+              disabled={isAuthenticating}
+              className="py-2 px-4 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none transition-all duration-200 disabled:opacity-50"
+            >
+              Back
+            </button>
+          </div>
+          
+          {error && (
+            <div className="mt-4 p-3 bg-red-50 rounded-md">
+              <p className="text-xs text-red-600">{error}</p>
+            </div>
+          )}
+        </div>
+      )}
+      
+      {/* Simple footer */}
+      <div className="mt-6 text-center">
+        <p className="text-xs text-gray-500">
+          Web3 Email System
+        </p>
+      </div>
     </div>
   );
 };
