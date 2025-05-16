@@ -19,9 +19,10 @@ import {
 import toast from 'react-hot-toast';
 import { useAccount } from 'wagmi';
 import api from './api';
+import { base } from 'viem/chains';
 
 // Contract address from environment
-const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '';
+const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '0xdBA1E0b65c5e14cC5B3500a53f1B555C58B90780';
 
 // Verify the contract address is valid
 if (!CONTRACT_ADDRESS) {
@@ -80,7 +81,11 @@ const EmailStorageButton: React.FC<EmailStorageProps> = ({ email, onStorageSucce
   // Prepare transaction calls
   const prepareStoreTransaction = useCallback(async () => {
     try {
+      // Set processing state early to prevent multiple clicks
+      setProcessing(true);
+      
       // 1. Call API to store on IPFS
+      console.log(`Calling API to store email ID: ${email.id}`);
       const response = await api.post('/emails-ipfs/store', {
         emailId: email.id
       });
@@ -96,10 +101,6 @@ const EmailStorageButton: React.FC<EmailStorageProps> = ({ email, onStorageSucce
       
       const emailIpfsCid = data.ipfsCid.cid;
       setIpfsHash(emailIpfsCid);
-      
-      // For debugging - check the exact type of emailId
-      console.log("Email ID type:", typeof email.id);
-      console.log("Email ID value:", email.id);
       
       // 2. Generate content hash - using only string values
       const contentHashData = {
@@ -122,9 +123,8 @@ const EmailStorageButton: React.FC<EmailStorageProps> = ({ email, onStorageSucce
       
       const recipients = [address];
       
-      // 4. Generate fixed encryption key for testing
-      // In a real app, you'd use proper encryption
-      const encryptedKeys = ["0x0000000000000000000000000000000000000000000000000000000000000000"];
+      // 4. Create properly formatted bytes array for encrypted keys - simplified approach
+      const encryptedKeys = ["0x0101010101010101010101010101010101010101010101010101010101010101"];
 
       // 5. Setup the contract call parameters using the format OnchainKit expects
       if (!CONTRACT_ADDRESS) {
@@ -138,9 +138,9 @@ const EmailStorageButton: React.FC<EmailStorageProps> = ({ email, onStorageSucce
         args: [emailIpfsCid, contentHash, recipients, encryptedKeys]
       });
       
-      // Return the call in the format OnchainKit expects
+      // Return the call in the format OnchainKit expects - keeping it minimal
       return [{
-        address: CONTRACT_ADDRESS,
+        address: CONTRACT_ADDRESS as `0x${string}`, // Ensure proper type as a hex string
         abi: CONTRACT_ABI,
         functionName: 'storeEmail',
         args: [
@@ -148,34 +148,46 @@ const EmailStorageButton: React.FC<EmailStorageProps> = ({ email, onStorageSucce
           contentHash,
           recipients,
           encryptedKeys
-        ]
+        ],
+        gas: BigInt(500000)
       }];
     } catch (error) {
       console.error('Error preparing store transaction:', error);
       
       // Extract more detailed error information
-      const errorMessage = error || 'Failed to prepare transaction';
-      toast.error(errorMessage as string);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to prepare transaction';
+      toast.error(errorMessage);
+      
+      // Reset processing state on error
+      setProcessing(false);
       
       throw error;
     }
   }, [email, address]);
 
-  // Handle transaction status updates
+  // Handle transaction status updates - simplified version
   const handleTransactionStatus = useCallback((status: LifecycleStatus) => {
     console.log('Transaction status:', status);
 
-    if (status.statusName === 'transactionPending') {
+    // Handle main states with minimal code
+    if (status.statusName === 'buildingTransaction') {
       setProcessing(true);
-      setStoreSuccess(false);
-      toast.loading('Storing email on blockchain...');
+      toast.loading('Preparing...', { id: 'tx-toast' });
     }
-
-    if (status.statusName === 'success') {
+    else if (status.statusName === 'transactionPending') {
+      setProcessing(true);
+      toast.loading('Storing...', { id: 'tx-toast' });
+      
+      // Store transaction hash if available
+      if (status.statusData?.hash) {
+        setTxHash(status.statusData.hash);
+      }
+    }
+    else if (status.statusName === 'success') {
       setProcessing(false);
       setStoreSuccess(true);
       
-      // Store tx hash
+      // Handle successful transaction
       if (status.statusData?.transactionReceipts?.length > 0) {
         const hash = status.statusData.transactionReceipts[0].transactionHash;
         setTxHash(hash);
@@ -188,33 +200,20 @@ const EmailStorageButton: React.FC<EmailStorageProps> = ({ email, onStorageSucce
         updateEmailStorageStatus(email.id, hash, ipfsHash);
       }
       
-      toast.success('Email successfully stored on blockchain!');
+      toast.success('Stored successfully!', { id: 'tx-toast' });
     }
-
-    if (status.statusName === 'error') {
+    else if (status.statusName === 'error') {
       setProcessing(false);
-      setStoreSuccess(false);
       
-      // Extract detailed error information
+      // Extract error message
       let errorMsg = 'Transaction failed';
-      
-      if (status.statusData) {
-        if (typeof status.statusData.error === 'string') {
-          try {
-            // Try to parse the error if it's a JSON string
-            const parsedError = JSON.parse(status.statusData.error);
-            errorMsg = parsedError.details || parsedError.message || status.statusData.message || 'Unknown error';
-          } catch (e) {
-            // If not JSON, use the error string directly
-            errorMsg = status.statusData.error || status.statusData.message || 'Unknown error';
-          }
-        } else {
-          errorMsg = status.statusData.message || 'Unknown error';
-        }
+      if (status.statusData?.error) {
+        errorMsg = typeof status.statusData.error === 'string' 
+          ? status.statusData.error 
+          : status.statusData.error.message || errorMsg;
       }
       
-      console.error('Transaction error details:', errorMsg);
-      toast.error(`Transaction failed: ${errorMsg}`);
+      toast.error(`Failed: ${errorMsg}`, { id: 'tx-toast' });
     }
   }, [onStorageSuccess, ipfsHash, email.id]);
 
@@ -227,6 +226,7 @@ const EmailStorageButton: React.FC<EmailStorageProps> = ({ email, onStorageSucce
         ipfsCid,
         status: 'stored'
       });
+      console.log('Email storage status updated successfully');
     } catch (error) {
       console.error('Error updating email status:', error);
       // Don't show toast here as it's not critical to the user experience
@@ -234,7 +234,7 @@ const EmailStorageButton: React.FC<EmailStorageProps> = ({ email, onStorageSucce
   };
 
   // Check if email is already stored on-chain
-  const isStored = email.minted || false;
+  const isStored = email.minted || storeSuccess || false;
 
   if (isStored) {
     return (
@@ -246,54 +246,52 @@ const EmailStorageButton: React.FC<EmailStorageProps> = ({ email, onStorageSucce
   }
 
   return (
-    <div className="flex items-center">
-      <div className="relative group">
-        <button
-          onClick={() => setShowInfo(!showInfo)}
-          className="p-1.5 rounded-full text-gray-400 hover:text-gray-700 dark:text-gray-500 dark:hover:text-gray-300"
-          title="Storage information"
-        >
-          <Info className="h-4 w-4" />
-        </button>
-        
-        {/* Tooltip for info */}
-        {showInfo && (
-          <div className="absolute right-0 mt-2 w-64 rounded-md shadow-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-3 z-20">
-            <div className="text-xs text-gray-600 dark:text-gray-300">
-              <p className="font-medium mb-1">Email Storage</p>
-              <p className="mb-2">Storing your email on-chain encrypts the data on IPFS and saves the reference to a blockchain contract, making it permanently available and secure.</p>
-              <p className="italic">Currently free during beta period.</p>
-            </div>
+    <div className="flex items-center gap-2">
+      {/* Info button */}
+      <button
+        onClick={() => setShowInfo(!showInfo)}
+        className="flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+        title="Storage information"
+      >
+        <Info className="h-3 w-3 mr-1" />
+        <span>Info</span>
+      </button>
+      
+      {/* Info tooltip */}
+      {showInfo && (
+        <div className="absolute right-0 mt-12 w-64 rounded-md shadow-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-3 z-20">
+          <div className="text-xs text-gray-600 dark:text-gray-300">
+            <p className="font-medium mb-1">Email Storage</p>
+            <p className="mb-2">Storing your email on-chain encrypts the data on IPFS and saves the reference to a blockchain contract, making it permanently available and secure.</p>
+            <p className="italic">Currently free during beta period.</p>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
+      {/* Status display or transaction button */}
       {storeSuccess ? (
-        <div className="ml-2 flex items-center px-2 py-1 rounded-md bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 text-xs">
+        <div className="flex items-center px-2 py-1 rounded-md bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 text-xs">
           <Shield className="h-3 w-3 mr-1" />
           <span>Stored On-chain</span>
         </div>
       ) : processing ? (
-        <div className="ml-2 flex items-center px-2 py-1 rounded-md bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs">
+        <div className="flex items-center px-2 py-1 rounded-md bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs">
           <Loader2 className="h-3 w-3 mr-1 animate-spin" />
           <span>Storing...</span>
         </div>
       ) : (
+        // Simplified Transaction component
         <Transaction
+          chainId={base.id}
           calls={prepareStoreTransaction}
           onStatus={handleTransactionStatus}
-       
         >
+          {/* Using the most minimal approach possible */}
           <TransactionButton
             text="Store On-chain"
             icon={<Database className="h-3 w-3 mr-1" />}
-            className="ml-2 flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:hover:bg-blue-800"
+            className="flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:hover:bg-blue-800"
           />
-        
-          <TransactionStatus>
-            <TransactionStatusLabel />
-            <TransactionStatusAction />
-          </TransactionStatus>
         </Transaction>
       )}
     </div>

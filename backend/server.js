@@ -53,6 +53,10 @@ app.use(express.json());
 app.use('/api/emails', emailRoutes);
 app.use('/api/emails-ipfs', emailIpfsRoutes);
 
+//now import webhooks
+const webhooks = require('./routes/webhooks');
+app.use('/api/webhooks', webhooks);
+
 
 // Global error handler
 app.use((err, req, res, next) => {
